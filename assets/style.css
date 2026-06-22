@@ -1,0 +1,177 @@
+/* ── Base Reset ───────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #0D0F14 !important;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+  color: #F0F2F7 !important;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Dropdown Dark Overrides ─────────────────── */
+.dash-dropdown-dark .Select-control,
+.dash-dropdown-dark .VirtualizedSelectOption,
+.dash-dropdown-dark .Select-menu-outer,
+.dash-dropdown-dark .Select--multi .Select-value {
+  background-color: #1C2130 !important;
+  border-color: #2A2F3E !important;
+  color: #F0F2F7 !important;
+}
+
+.Select-control {
+  background-color: #1C2130 !important;
+  border: 1px solid #2A2F3E !important;
+  border-radius: 6px !important;
+  color: #F0F2F7 !important;
+  min-height: 36px !important;
+}
+
+.Select-placeholder, .Select-value-label, .Select-input input {
+  color: #8892A4 !important;
+  font-size: 13px !important;
+  font-family: 'Inter', sans-serif !important;
+}
+
+.Select-value-label { color: #F0F2F7 !important; }
+
+.Select-menu-outer {
+  background-color: #1C2130 !important;
+  border: 1px solid #2A2F3E !important;
+  z-index: 9999 !important;
+}
+
+.VirtualizedSelectOption {
+  background-color: #1C2130 !important;
+  color: #F0F2F7 !important;
+  font-size: 13px !important;
+  padding: 8px 12px !important;
+}
+
+.VirtualizedSelectOption:hover,
+.VirtualizedSelectFocusedOption {
+  background-color: #252B3B !important;
+}
+
+.Select--multi .Select-value {
+  background-color: #252B3B !important;
+  border-color: #2A2F3E !important;
+  color: #F0F2F7 !important;
+  border-radius: 4px !important;
+}
+
+.Select--multi .Select-value-icon {
+  border-right-color: #2A2F3E !important;
+  color: #8892A4 !important;
+}
+
+.Select-arrow { border-top-color: #8892A4 !important; }
+.is-open .Select-arrow { border-bottom-color: #8892A4 !important; }
+
+/* ── Dash 2.x react-select overrides (BEM class names) ─────────────────── */
+.Select__control {
+  background-color: #1C2130 !important;
+  border: 1px solid #2A2F3E !important;
+  border-radius: 6px !important;
+  min-height: 36px !important;
+  box-shadow: none !important;
+}
+.Select__control:hover { border-color: #4F8EF7 !important; }
+
+.Select__single-value {
+  color: #F0F2F7 !important;
+  font-size: 13px !important;
+  font-family: 'Inter', sans-serif !important;
+}
+
+.Select__placeholder {
+  color: #8892A4 !important;
+  font-size: 13px !important;
+}
+
+.Select__input-container, .Select__input-container input {
+  color: #F0F2F7 !important;
+  font-size: 13px !important;
+  font-family: 'Inter', sans-serif !important;
+}
+
+.Select__menu {
+  background-color: #1C2130 !important;
+  border: 1px solid #2A2F3E !important;
+  z-index: 9999 !important;
+}
+
+.Select__menu-list { padding: 0 !important; }
+
+.Select__option {
+  background-color: #1C2130 !important;
+  color: #F0F2F7 !important;
+  font-size: 13px !important;
+  padding: 8px 12px !important;
+  cursor: pointer !important;
+}
+.Select__option--is-focused { background-color: #252B3B !important; }
+.Select__option--is-selected {
+  background-color: #252B3B !important;
+  color: #4F8EF7 !important;
+}
+
+.Select__indicator-separator { background-color: #2A2F3E !important; }
+.Select__dropdown-indicator { color: #8892A4 !important; }
+.Select__dropdown-indicator:hover { color: #F0F2F7 !important; }
+
+/* ── Range Slider ────────────────────────────── */
+.dash-slider-track { background-color: #2A2F3E !important; }
+.dash-slider-range { background-color: #4F8EF7 !important; }
+.dash-slider-thumb {
+  background-color: #4F8EF7 !important;
+  border-color: #0D0F14 !important;
+  box-shadow: 0 0 0 3px rgba(79,142,247,0.2) !important;
+}
+.dash-slider-mark { color: #8892A4 !important; font-size: 11px !important; }
+.dash-range-slider-input { color: #000000 !important; }
+
+/* ── Plotly chart tooltip ─────────────────────── */
+.plotly .hoverlayer .hovertext { font-family: 'Inter', sans-serif !important; }
+
+/* ── Reset button hover ─────────────────────── */
+#btn-reset:hover {
+  background: #252B3B !important;
+  color: #F0F2F7 !important;
+  border-color: #4F8EF7 !important;
+}
+
+/* ── Scrollbar ────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #0D0F14; }
+::-webkit-scrollbar-thumb { background: #2A2F3E; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #4F8EF7; }
+
+/* ── Responsive ───────────────────────────────── */
+@media (max-width: 640px) {
+  /* filter bar stacks */
+  #filter-state, #filter-coalition { min-width: 100% !important; }
+}
+
+/* ── Navbar link hover ──────────────────────────── */
+.nav-link:hover {
+  background: #1C2130 !important;
+  color: #F0F2F7 !important;
+}
+
+/* ── Rank pills hover ───────────────────────────── */
+.rank-pill:hover {
+  background: #252B3B !important;
+  color: #F0F2F7 !important;
+  border-color: #4F8EF7 !important;
+}
+
+/* ── DataTable dark overrides ───────────────────── */
+.dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner td,
+.dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner th {
+  background-color: #161A23 !important;
+  color: #F0F2F7 !important;
+  border-color: #2A2F3E !important;
+}
+.dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner tr:hover td {
+  background-color: #1C2130 !important;
+}
