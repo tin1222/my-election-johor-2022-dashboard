@@ -21,7 +21,7 @@ app = dash.Dash(
     suppress_callback_exceptions=True,
     meta_tags=[{"name": "viewport", "content": "width=device-width, initial-scale=1"}],
 )
-app.title = "GE15 Malaysia — Tindak Malaysia"
+app.title = "Johor 2022 — Tindak Malaysia"
 server = app.server
 
 Cache(app.server, config={"CACHE_TYPE": "SimpleCache", "CACHE_DEFAULT_TIMEOUT": 300})
@@ -89,7 +89,7 @@ def topbar():
                     "padding":"2px 7px","fontSize":"12px","fontWeight":"800",
                     "letterSpacing":"0.06em","marginRight":"8px",
                 }),
-                html.Span("Malaysia 2022", style={
+                html.Span("Johor 2022", style={
                     "color":TEXT_PRIMARY,"fontSize":"14px","fontWeight":"600",
                 }),
             ], href="/", style={"textDecoration":"none","display":"flex","alignItems":"center",
@@ -253,4 +253,4 @@ def route(pathname):
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=8050)
+    app.run(debug=True, port=8051)
