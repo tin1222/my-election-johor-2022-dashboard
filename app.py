@@ -21,19 +21,19 @@ app = dash.Dash(
     suppress_callback_exceptions=True,
     meta_tags=[{"name": "viewport", "content": "width=device-width, initial-scale=1"}],
 )
-app.title = "Johor 2022 — Tindak Malaysia"
+app.title = "Johor Elections — Tindak Malaysia"
 server = app.server
 
 Cache(app.server, config={"CACHE_TYPE": "SimpleCache", "CACHE_DEFAULT_TIMEOUT": 300})
 
 from pages import (
     johor_overview, johor_comparison, johor_rankings, johor_demographics, johor_map,
-    johor_simulation)
+    johor_simulation, johor2026_candidates, johor2026_simulation)
 
-TINDAK_GITHUB = "https://github.com/TindakMalaysia/HISTORICAL-ELECTION-RESULTS/blob/main/2022-ELECTION-RESULTS/MALAYSIA_2022_PARLIAMENT_RESULTS.csv"
+TINDAK_GITHUB = "https://github.com/TindakMalaysia/HISTORICAL-ELECTION-RESULTS"
 AUTHOR = "Justin Ng Wen Xuan (Tindak)"
 
-NAV_PAGES = [
+NAV_PAGES_2022 = [
     {"label": "Overview",     "href": "/johor",               "icon": "📊"},
     {"label": "Comparison",   "href": "/johor/comparison",    "icon": "⚖️"},
     {"label": "Rankings",     "href": "/johor/rankings",      "icon": "🏆"},
@@ -41,6 +41,20 @@ NAV_PAGES = [
     {"label": "Map",          "href": "/johor/map",           "icon": "🗺️"},
     {"label": "Simulation",   "href": "/johor/simulation",    "icon": "🔬"},
 ]
+
+NAV_PAGES_2026 = [
+    {"label": "Candidates",   "href": "/johor2026/candidates",  "icon": "🧑‍🤝‍🧑"},
+    {"label": "Simulation",   "href": "/johor2026/simulation",  "icon": "🔬"},
+]
+
+SECTIONS = {
+    "2022": {"label": "🏛️ Johor State 2022", "home": "/johor",              "pages": NAV_PAGES_2022},
+    "2026": {"label": "🏛️ Johor State 2026", "home": "/johor2026/candidates", "pages": NAV_PAGES_2026},
+}
+
+
+def section_for(pathname):
+    return "2026" if (pathname or "").startswith("/johor2026") else "2022"
 
 # Sidebar style constants
 SIDEBAR_OPEN  = {
@@ -77,23 +91,21 @@ def topbar():
             "alignItems":"center","justifyContent":"center","flexShrink":"0",
         }),
 
-        # Centre: brand
+        # Centre: brand + section switcher
         html.Div([
             html.A([
                 html.Img(src="/assets/tindak_logo.png",
                          style={"height":"30px","marginRight":"8px","borderRadius":"4px"}),
                 html.Img(src="/assets/tindak_malaysia.png",
                          style={"height":"24px","marginRight":"10px"}),
-                html.Span("GE15", style={
-                    "background":ACCENT,"color":"white","borderRadius":"4px",
-                    "padding":"2px 7px","fontSize":"12px","fontWeight":"800",
-                    "letterSpacing":"0.06em","marginRight":"8px",
-                }),
-                html.Span("Johor 2022", style={
-                    "color":TEXT_PRIMARY,"fontSize":"14px","fontWeight":"600",
-                }),
             ], href="/", style={"textDecoration":"none","display":"flex","alignItems":"center",
-                                "marginRight":"20px"}),
+                                "marginRight":"14px"}),
+            html.Span("Johor", style={"color":TEXT_PRIMARY,"fontSize":"14px","fontWeight":"600",
+                                       "marginRight":"10px"}),
+            html.Div([
+                dcc.Link("2022", id="topbar-tab-2022", href=SECTIONS["2022"]["home"]),
+                dcc.Link("2026", id="topbar-tab-2026", href=SECTIONS["2026"]["home"]),
+            ], style={"display":"flex","gap":"4px","background":BG_CARD2,"borderRadius":"8px","padding":"3px"}),
         ], style={"display":"flex","alignItems":"center"}),
 
         # Right: spacer to balance hamburger
@@ -152,7 +164,7 @@ def footer():
         ], style={"marginBottom":"10px","display":"flex","alignItems":"center","justifyContent":"center"}),
         html.Div([
             html.Span("Data Source: ", style={"color":TEXT_MUTED,"fontSize":"12px"}),
-            html.A("Tindak Malaysia Historical Elections — GE15 Parliament Results",
+            html.A("Tindak Malaysia Historical Elections",
                    href=TINDAK_GITHUB, target="_blank",
                    style={"color":ACCENT,"fontSize":"12px","textDecoration":"none"}),
         ], style={"marginBottom":"4px"}),
@@ -214,10 +226,11 @@ def toggle_sidebar(open_clicks, close_clicks, overlay_clicks, pathname):
 )
 def update_sidebar_nav(pathname):
     p       = pathname or "/"
-    section = "🏛️ Johor State 2022"
+    sec     = SECTIONS[section_for(p)]
+    section = sec["label"]
 
     links = []
-    for page in NAV_PAGES:
+    for page in sec["pages"]:
         is_active = p == page["href"]
         links.append(dcc.Link(
             html.Div([
@@ -239,16 +252,38 @@ def update_sidebar_nav(pathname):
     return section, links
 
 
+# ── Topbar section switcher (2022 / 2026) ──────────────────────────────────────
+
+def _tab_style(is_active):
+    return {
+        "padding":"5px 14px","borderRadius":"6px","fontSize":"13px","fontWeight":"700" if is_active else "500",
+        "textDecoration":"none","color":TEXT_PRIMARY if is_active else TEXT_MUTED,
+        "background": ACCENT if is_active else "transparent","transition":"all 0.15s",
+    }
+
+@app.callback(
+    Output("topbar-tab-2022", "style"),
+    Output("topbar-tab-2026", "style"),
+    Input("url", "pathname"),
+)
+def update_topbar_tabs(pathname):
+    sec = section_for(pathname)
+    return _tab_style(sec == "2022"), _tab_style(sec == "2026")
+
+
 # ── Page routing ──────────────────────────────────────────────────────────────
 
 @app.callback(Output("page-content", "children"), Input("url", "pathname"))
 def route(pathname):
-    if pathname == "/johor":              return johor_overview.layout()
-    if pathname == "/johor/comparison":   return johor_comparison.layout()
-    if pathname == "/johor/rankings":     return johor_rankings.layout()
-    if pathname == "/johor/demographics": return johor_demographics.layout()
-    if pathname == "/johor/map":          return johor_map.layout()
-    if pathname == "/johor/simulation":   return johor_simulation.layout()
+    if pathname == "/johor":                 return johor_overview.layout()
+    if pathname == "/johor/comparison":      return johor_comparison.layout()
+    if pathname == "/johor/rankings":        return johor_rankings.layout()
+    if pathname == "/johor/demographics":    return johor_demographics.layout()
+    if pathname == "/johor/map":             return johor_map.layout()
+    if pathname == "/johor/simulation":      return johor_simulation.layout()
+    if pathname == "/johor2026/candidates":  return johor2026_candidates.layout()
+    if pathname == "/johor2026/simulation":  return johor2026_simulation.layout()
+    if pathname == "/johor2026":             return johor2026_candidates.layout()
     return johor_overview.layout()
 
 

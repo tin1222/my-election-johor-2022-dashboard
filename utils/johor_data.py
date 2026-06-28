@@ -13,8 +13,10 @@ JOHOR_COALITION_COLORS = {
     "PH":       "#E53935",
     "BN":       "#1565C0",
     "PN":       "#4CAF50",
-    "MUDA":     "#FF7043",
+    "MUDA":     "#000000",
     "PEJUANG":  "#795548",
+    "BERSAMA":  "#FFEB3B",
+    "PBM":      "#8D6E63",
     "OTHERS":   "#9E9E9E",
     "INDEPENDENT": "#607D8B",
 }
