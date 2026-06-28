@@ -40,6 +40,18 @@ def card_style():
     return {"background": BG_CARD, "border": f"1px solid {BORDER}", "borderRadius": "12px", "padding": "4px"}
 
 
+TAB_STYLE = {
+    "backgroundColor": BG_CARD, "color": TEXT_MUTED, "border": "none",
+    "borderBottom": f"1px solid {BORDER}", "padding": "12px 16px",
+    "fontFamily": "Inter, sans-serif", "fontSize": "13px",
+}
+TAB_SELECTED_STYLE = {
+    "backgroundColor": BG_CARD2, "color": TEXT_PRIMARY, "border": "none",
+    "borderBottom": f"3px solid {ACCENT}", "padding": "12px 16px",
+    "fontFamily": "Inter, sans-serif", "fontSize": "13px", "fontWeight": "700",
+}
+
+
 def _label_style():
     return {"color": TEXT_MUTED, "fontSize": "11px", "textTransform": "uppercase",
             "letterSpacing": "0.07em", "marginBottom": "5px", "display": "block"}
@@ -733,9 +745,9 @@ def layout():
         ], style={"background": BG_CARD, "borderBottom": f"1px solid {BORDER}", "padding": "20px 28px"}),
 
         dcc.Tabs(id="j26-sim-tabs", value="seat", children=[
-            dcc.Tab(label="Seat Detail", value="seat"),
-            dcc.Tab(label="Statewide Rollup", value="state"),
-        ], style={"padding": "0 28px"}),
+            dcc.Tab(label="Seat Detail", value="seat", style=TAB_STYLE, selected_style=TAB_SELECTED_STYLE),
+            dcc.Tab(label="Statewide Rollup", value="state", style=TAB_STYLE, selected_style=TAB_SELECTED_STYLE),
+        ], style={"padding": "0 28px", "backgroundColor": BG_CARD, "borderBottom": f"1px solid {BORDER}"}),
 
         html.Div(id="j26-sim-tab-content", style={"padding": "20px 28px 28px"}),
     ], style={"background": BG_DARK, "minHeight": "100vh", "color": TEXT_PRIMARY, "fontFamily": "Inter, sans-serif"})
