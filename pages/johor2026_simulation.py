@@ -22,7 +22,7 @@ from collections import defaultdict
 from utils.johor2026_data import (
     load_2022_candidates, load_2026_candidates, get_seat_2022, get_seat_2026,
     bloc_votes_for_seat_2022, blocs_contesting_2026, seat_options, party_color, bloc_color,
-    load_geo, BLOC_ORDER, coalition_label,
+    load_geo, coalition_label, blocs_in_2022, blocs_in_2026,
 )
 from utils import BG_DARK, BG_CARD, BG_CARD2, BORDER, TEXT_PRIMARY, TEXT_MUTED, ACCENT, map_bounds_zoom
 
@@ -457,7 +457,8 @@ def recompute_seat(pct_values, to_values, pct_ids, to_ids, code):
 
 # ── Statewide Rollup ──────────────────────────────────────────────────────────────
 
-BLOC_OPTS = [{"label": b, "value": b} for b in BLOC_ORDER]
+FROM_BLOC_OPTS = [{"label": b, "value": b} for b in blocs_in_2022()]
+TO_BLOC_OPTS = [{"label": b, "value": b} for b in blocs_in_2026()]
 
 
 def simulate_statewide(turnout_delta, swing_rules):
@@ -537,13 +538,13 @@ MAX_NUM_RULES = 10
 
 def build_rule_row(i):
     return html.Div([
-        dcc.Dropdown(id={"type": "j26-roll-from", "idx": i}, options=BLOC_OPTS, value=None,
-                     placeholder="From bloc", clearable=True, className="dash-dropdown-dark",
-                     style={"minWidth": "120px"}),
+        dcc.Dropdown(id={"type": "j26-roll-from", "idx": i}, options=FROM_BLOC_OPTS, value=None,
+                     placeholder="From bloc (2022)", clearable=True, className="dash-dropdown-dark",
+                     style={"minWidth": "140px"}),
         html.Span("→", style={"color": TEXT_MUTED, "alignSelf": "center", "padding": "0 4px"}),
-        dcc.Dropdown(id={"type": "j26-roll-to", "idx": i}, options=BLOC_OPTS, value=None,
-                     placeholder="To bloc", clearable=True, className="dash-dropdown-dark",
-                     style={"minWidth": "120px"}),
+        dcc.Dropdown(id={"type": "j26-roll-to", "idx": i}, options=TO_BLOC_OPTS, value=None,
+                     placeholder="To bloc (2026)", clearable=True, className="dash-dropdown-dark",
+                     style={"minWidth": "140px"}),
         dcc.Input(id={"type": "j26-roll-pct", "idx": i}, type="number", value=0, min=0, max=100, step=1,
                   style={"background": BG_CARD2, "border": f"1px solid {BORDER}", "color": TEXT_PRIMARY,
                          "borderRadius": "6px", "padding": "6px 8px", "width": "64px", "marginLeft": "6px",

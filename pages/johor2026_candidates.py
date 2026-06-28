@@ -13,9 +13,9 @@ import numpy as np
 from collections import defaultdict
 
 from utils.johor2026_data import (
-    load_2026_candidates, party_color, bloc_color, load_geo, seat_options, seat_code_label, coalition_label,
+    load_2026_candidates, load_2026_demographics, party_color, bloc_color, load_geo, seat_options,
+    seat_code_label, coalition_label,
 )
-from utils.johor_data import load_johor_demographics
 from utils import BG_DARK, BG_CARD, BG_CARD2, BORDER, TEXT_PRIMARY, TEXT_MUTED, ACCENT, map_bounds_zoom
 
 JOHOR_CENTER = (1.8, 103.3, 8.2)
@@ -89,6 +89,7 @@ def make_map(df_all, df_filtered):
         by_seat[row["UNIQUE CODE"]].append(row)
 
     highlighted_codes = set(df_filtered["UNIQUE CODE"].unique())
+    is_filtered = bool(highlighted_codes) and len(highlighted_codes) < 56
 
     def hover_for(code):
         rows = by_seat.get(code, [])
@@ -106,25 +107,30 @@ def make_map(df_all, df_filtered):
 
     fig = go.Figure()
 
+    # Only draw seats matching the active filter, so picking a party shows just its seats
+    # (rather than colouring all 56 by total candidate count, which hid the filter's effect).
+    shown_feats = [f for f in geo["features"] if f["id"] in highlighted_codes] if is_filtered else geo["features"]
+    shown_geo = {"type": "FeatureCollection", "features": shown_feats} if is_filtered else geo
+
     loc_z, hover_map = {}, {}
-    for feat in geo["features"]:
+    for feat in shown_feats:
         code = feat["id"]
         n = len(by_seat.get(code, []))
         loc_z[code] = n
         hover_map[code] = hover_for(code)
     fig.add_trace(go.Choroplethmap(
-        geojson=geo, locations=list(loc_z.keys()), z=list(loc_z.values()),
+        geojson=shown_geo, locations=list(loc_z.keys()), z=list(loc_z.values()),
         colorscale="Blues", showscale=True,
         colorbar=dict(title=dict(text="Candidates", font=dict(color=TEXT_MUTED, size=11)),
-                      tickfont=dict(color=TEXT_MUTED, size=10), thickness=12, len=0.6),
+                      tickfont=dict(color=TEXT_MUTED, size=10), thickness=12, len=0.6,
+                      tickmode="linear", tick0=0, dtick=1),
         hovertext=list(hover_map.values()), hoverinfo="text",
         marker=dict(opacity=0.85, line=dict(color="#1a1a2e", width=0.4)),
         name="Candidates per seat",
     ))
 
-    if highlighted_codes and len(highlighted_codes) < 56:
-        feats = [f for f in geo["features"] if f["id"] in highlighted_codes]
-        lat_c, lon_c, zoom = map_bounds_zoom(feats) if feats else JOHOR_CENTER
+    if is_filtered:
+        lat_c, lon_c, zoom = map_bounds_zoom(shown_feats) if shown_feats else JOHOR_CENTER
     else:
         lat_c, lon_c, zoom = JOHOR_CENTER
 
@@ -269,8 +275,11 @@ def layout():
                   "background": BG_CARD, "borderBottom": f"1px solid {BORDER}", "padding": "14px 28px",
                   "position": "sticky", "top": "52px", "zIndex": "100"}),
 
-        html.Div(id="j26-cand-kpis", style={"display": "flex", "gap": "12px", "flexWrap": "wrap",
-                                             "padding": "20px 28px 0"}),
+        html.Div([
+            html.Div(id="j26-cand-kpis", style={"display": "contents"}),
+            html.Div(id="j26-cand-crowded-kpi", style={"display": "contents"}),
+            dcc.Interval(id="j26-cand-crowded-interval", interval=3000, n_intervals=0),
+        ], style={"display": "flex", "gap": "12px", "flexWrap": "wrap", "padding": "20px 28px 0"}),
 
         html.Div([
             html.Div([
@@ -314,6 +323,30 @@ def reset_filters(_):
 
 
 @callback(
+    Output("j26-cand-crowded-kpi", "children"),
+    Input("j26-cand-seat", "value"),
+    Input("j26-cand-party", "value"),
+    Input("j26-cand-crowded-interval", "n_intervals"),
+)
+def update_crowded_kpi(seats, parties, n_intervals):
+    df_all = load_2026_candidates()
+    df = _filter(df_all, seats, parties)
+    seats_in_scope = set(df["UNIQUE CODE"].unique())
+    seat_counts = df_all[df_all["UNIQUE CODE"].isin(seats_in_scope)].groupby("UNIQUE CODE").size() \
+                  if seats else df_all.groupby("UNIQUE CODE").size()
+
+    if not len(seat_counts):
+        return [_kpi("Most Crowded Seats", "—", "", color="#FF7043")]
+
+    max_n = int(seat_counts.max())
+    tied_codes = seat_counts[seat_counts == max_n].index.tolist()
+    code = tied_codes[n_intervals % len(tied_codes)]
+    label = df_all[df_all["UNIQUE CODE"] == code]["SEAT_LABEL"].iloc[0]
+    sub = f"{max_n} candidates" + (f" · {len(tied_codes)} seats tied" if len(tied_codes) > 1 else "")
+    return [_kpi("Most Crowded Seats", label.title(), sub, color="#FF7043")]
+
+
+@callback(
     Output("j26-cand-kpis", "children"),
     Output("j26-cand-map", "figure"),
     Output("j26-cand-gender", "figure"),
@@ -326,25 +359,18 @@ def reset_filters(_):
 def update(seats, parties):
     df_all = load_2026_candidates()
     df = _filter(df_all, seats, parties)
-    demo = load_johor_demographics()
+    demo = load_2026_demographics()
     seats_in_scope = set(df["UNIQUE CODE"].unique())
 
     n = len(df)
     n_seats = df["UNIQUE CODE"].nunique()
     n_parties = df["PARTY"].nunique()
     female_pct = (df["SEX"] == "FEMALE").sum() / n * 100 if n else 0
-    seat_counts = df_all[df_all["UNIQUE CODE"].isin(seats_in_scope)].groupby("UNIQUE CODE").size() \
-                  if seats else df_all.groupby("UNIQUE CODE").size()
-    crowded_code = seat_counts.idxmax() if len(seat_counts) else None
-    crowded_label = df_all[df_all["UNIQUE CODE"] == crowded_code]["SEAT_LABEL"].iloc[0] if crowded_code else "—"
-    crowded_n = int(seat_counts.max()) if len(seat_counts) else 0
 
     kpis = [
         _kpi("Candidates", str(n), f"across {n_seats} seat(s)"),
         _kpi("Parties Fielding Candidates", str(n_parties), "individually tracked", color="#26C6DA"),
         _kpi("Female Candidates", f"{female_pct:.1f}%", "of selection", color="#E91E63"),
-        _kpi("Most Crowded Seat", crowded_label.title() if crowded_label else "—",
-             f"{crowded_n} candidates", color="#FF7043"),
     ]
 
     fig_map = make_map(df_all, df)

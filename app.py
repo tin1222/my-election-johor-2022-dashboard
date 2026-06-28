@@ -54,7 +54,10 @@ SECTIONS = {
 
 
 def section_for(pathname):
-    return "2026" if (pathname or "").startswith("/johor2026") else "2022"
+    p = pathname or "/"
+    if p == "/" or p.startswith("/johor2026"):
+        return "2026"
+    return "2022"
 
 # Sidebar style constants
 SIDEBAR_OPEN  = {
@@ -103,8 +106,8 @@ def topbar():
             html.Span("Johor", style={"color":TEXT_PRIMARY,"fontSize":"14px","fontWeight":"600",
                                        "marginRight":"10px"}),
             html.Div([
-                dcc.Link("2022", id="topbar-tab-2022", href=SECTIONS["2022"]["home"]),
                 dcc.Link("2026", id="topbar-tab-2026", href=SECTIONS["2026"]["home"]),
+                dcc.Link("2022", id="topbar-tab-2022", href=SECTIONS["2022"]["home"]),
             ], style={"display":"flex","gap":"4px","background":BG_CARD2,"borderRadius":"8px","padding":"3px"}),
         ], style={"display":"flex","alignItems":"center"}),
 
@@ -231,7 +234,7 @@ def update_sidebar_nav(pathname):
 
     links = []
     for page in sec["pages"]:
-        is_active = p == page["href"]
+        is_active = p == page["href"] or (p == "/" and page["href"] == sec["home"])
         links.append(dcc.Link(
             html.Div([
                 html.Span(page["icon"], style={"marginRight":"10px","fontSize":"15px"}),
@@ -284,7 +287,7 @@ def route(pathname):
     if pathname == "/johor2026/candidates":  return johor2026_candidates.layout()
     if pathname == "/johor2026/simulation":  return johor2026_simulation.layout()
     if pathname == "/johor2026":             return johor2026_candidates.layout()
-    return johor_overview.layout()
+    return johor2026_candidates.layout()
 
 
 if __name__ == "__main__":

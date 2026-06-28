@@ -32,7 +32,7 @@ PARTY_COLORS = {
     "UMNO": "#1565C0", "MCA": "#1E88E5", "MIC": "#64B5F6", "GERAKAN": "#0D47A1",
     "PKR": "#C62828", "DAP": "#E53935", "AMANAH": "#EF5350",
     "PAS": "#2E7D32", "PPBM": "#66BB6A", "BERSATU": "#66BB6A",
-    "MUDA": "#000000",
+    "MUDA": "#FF7043",
     "BERSAMA": "#FFEB3B",
     "PEJUANG": "#795548",
     "PBM": "#8D6E63",
@@ -44,7 +44,7 @@ PARTY_COLORS = {
 
 BLOC_COLORS = {
     "BN": "#1565C0", "PH": "#E53935", "PN": "#4CAF50",
-    "MUDA": "#000000", "BERSAMA": "#FFEB3B", "PEJUANG": "#795548",
+    "MUDA": "#FF7043", "BERSAMA": "#FFEB3B", "PEJUANG": "#795548",
     "PBM": "#8D6E63", "OTHERS": "#9E9E9E", "INDEPENDENT": "#607D8B",
 }
 
@@ -207,6 +207,44 @@ def load_2026_candidates():
     long_df = _melt(df, JOHOR_2026_SLOTS, has_votes=False)
     _CACHE["c2026"] = long_df
     return long_df
+
+
+def load_2026_demographics():
+    """Johor 2026 DUN composition (electors). Output column names match
+    utils.johor_data.load_johor_demographics() so chart code can be shared."""
+    if "demo2026" in _CACHE:
+        return _CACHE["demo2026"]
+    demo = pd.read_csv("data/JOHOR_2026_DUN_COMPOSITION.csv")
+    demo = _norm_cols(demo)
+    rename = {
+        "18 - 20 (%)": "18-20 (%)",
+        "21 - 29 (%)": "21-29 (%)",
+        "30 - 39 (%)": "30-39 (%)",
+        "40 - 49 (%)": "40-49 (%)",
+        "50 - 59 (%)": "50-59 (%)",
+        "60 - 69 (%)": "60-69 (%)",
+        "70 - 79 (%)": "70-79 (%)",
+        "80 - 89 (%)": "80-89 (%)",
+        "90 AND ABOVE (%)": "ABOVE 90 (%)",
+        "FEMALE ELECTORS (%)": "WOMEN ELECTORS (%)",
+        "URBAN - RURAL CLASSIFICATION (2025)": "URBAN-RURAL CLASSIFICATION (2026)",
+    }
+    demo = demo.rename(columns=rename)
+    demo["YOUTH_PCT"] = demo["18-20 (%)"].fillna(0) + demo["21-29 (%)"].fillna(0)
+    _CACHE["demo2026"] = demo
+    return demo
+
+
+def blocs_in_2022():
+    """Blocs that actually contested in 2022, in BLOC_ORDER's display order."""
+    present = set(load_2022_candidates()["BLOC"].unique())
+    return [b for b in BLOC_ORDER if b in present]
+
+
+def blocs_in_2026():
+    """Blocs that actually contest in 2026, in BLOC_ORDER's display order."""
+    present = set(load_2026_candidates()["BLOC"].unique())
+    return [b for b in BLOC_ORDER if b in present]
 
 
 def seat_options():
