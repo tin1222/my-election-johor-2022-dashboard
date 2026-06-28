@@ -242,13 +242,11 @@ def layout():
                 html.Span("CANDIDATES", style={"background": "#26C6DA", "color": "#06262b", "borderRadius": "4px",
                           "padding": "2px 8px", "fontSize": "10px", "fontWeight": "800",
                           "letterSpacing": "0.07em", "marginRight": "10px"}),
-                html.Span("Johor 2026 nomination day", style={"color": TEXT_MUTED, "fontSize": "13px"}),
+                html.Span("Johor 2026 Nomination", style={"color": TEXT_MUTED, "fontSize": "13px"}),
             ], style={"marginBottom": "6px"}),
             html.H2("Johor 2026 — Candidates Overview", style={"color": TEXT_PRIMARY,
                 "fontSize": "clamp(18px,3vw,26px)", "fontWeight": "700", "margin": "0 0 8px 0",
                 "letterSpacing": "-0.02em"}),
-            html.Div("Every party shown individually — MUDA, BERSAMA and other minor parties are never lumped into an OTHERS bucket.",
-                     style={"color": TEXT_MUTED, "fontSize": "12px"}),
         ], style={"background": BG_CARD, "borderBottom": f"1px solid {BORDER}", "padding": "20px 28px"}),
 
         # Filters
