@@ -28,7 +28,7 @@ Cache(app.server, config={"CACHE_TYPE": "SimpleCache", "CACHE_DEFAULT_TIMEOUT": 
 
 from pages import (
     johor_overview, johor_comparison, johor_rankings, johor_demographics, johor_map,
-    johor_simulation, johor2026_candidates, johor2026_simulation)
+    johor_simulation, johor2026_candidates, johor2026_demographics, johor2026_simulation)
 
 TINDAK_GITHUB = "https://github.com/TindakMalaysia/HISTORICAL-ELECTION-RESULTS"
 AUTHOR = "Justin Ng Wen Xuan (Tindak)"
@@ -43,8 +43,9 @@ NAV_PAGES_2022 = [
 ]
 
 NAV_PAGES_2026 = [
-    {"label": "Candidates",   "href": "/johor2026/candidates",  "icon": "🧑‍🤝‍🧑"},
-    {"label": "Simulation",   "href": "/johor2026/simulation",  "icon": "🔬"},
+    {"label": "Candidates",   "href": "/johor2026/candidates",   "icon": "🧑‍🤝‍🧑"},
+    {"label": "Demographics", "href": "/johor2026/demographics", "icon": "👥"},
+    {"label": "Simulation",   "href": "/johor2026/simulation",   "icon": "🔬"},
 ]
 
 SECTIONS = {
@@ -284,9 +285,10 @@ def route(pathname):
     if pathname == "/johor/demographics":    return johor_demographics.layout()
     if pathname == "/johor/map":             return johor_map.layout()
     if pathname == "/johor/simulation":      return johor_simulation.layout()
-    if pathname == "/johor2026/candidates":  return johor2026_candidates.layout()
-    if pathname == "/johor2026/simulation":  return johor2026_simulation.layout()
-    if pathname == "/johor2026":             return johor2026_candidates.layout()
+    if pathname == "/johor2026/candidates":   return johor2026_candidates.layout()
+    if pathname == "/johor2026/demographics": return johor2026_demographics.layout()
+    if pathname == "/johor2026/simulation":   return johor2026_simulation.layout()
+    if pathname == "/johor2026":              return johor2026_candidates.layout()
     return johor2026_candidates.layout()
 
 

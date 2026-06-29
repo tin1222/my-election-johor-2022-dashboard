@@ -166,11 +166,10 @@ def make_gender_chart(df, demo, seats_in_scope):
         text=[f"{v:.1f}%" for v in [cand_male, cand_female]], textposition="outside",
         hovertemplate="<b>%{x}</b><br>Candidates: %{y:.1f}%<extra></extra>"))
     fig.update_layout(**CHART_LAYOUT,
-        title=dict(text="Electorate vs Candidate Gender Breakdown", font=dict(size=14, color=TEXT_PRIMARY), x=0.01),
         barmode="group", showlegend=True,
         xaxis=dict(showgrid=False, color=TEXT_MUTED),
         yaxis=dict(range=[0, 100], ticksuffix="%", showgrid=True, gridcolor=BORDER, color=TEXT_MUTED),
-        bargap=0.3, margin=dict(l=10, r=10, t=45, b=10))
+        bargap=0.3, margin=dict(l=10, r=10, t=10, b=10))
     return fig
 
 
@@ -195,11 +194,10 @@ def make_age_chart(df, demo, seats_in_scope):
         text=[f"{v:.1f}%" for v in cand_vals], textposition="outside",
         hovertemplate="<b>%{x}</b><br>Candidates: %{y:.1f}%<extra></extra>"))
     fig.update_layout(**CHART_LAYOUT,
-        title=dict(text="Electorate vs Candidate Age Breakdown", font=dict(size=14, color=TEXT_PRIMARY), x=0.01),
         barmode="group", showlegend=True,
         xaxis=dict(showgrid=False, color=TEXT_MUTED),
         yaxis=dict(ticksuffix="%", showgrid=True, gridcolor=BORDER, color=TEXT_MUTED),
-        bargap=0.2, margin=dict(l=10, r=10, t=45, b=10))
+        bargap=0.2, margin=dict(l=10, r=10, t=10, b=10))
     return fig
 
 
@@ -292,10 +290,24 @@ def layout():
         ], style={"padding": "16px 28px 0"}),
 
         html.Div([
-            html.Div([dcc.Graph(id="j26-cand-gender", config={"displayModeBar": False}, style={"height": "340px"})],
-                     style={"flex": "1", "minWidth": "300px", **card_style()}),
-            html.Div([dcc.Graph(id="j26-cand-age", config={"displayModeBar": False}, style={"height": "340px"})],
-                     style={"flex": "1", "minWidth": "300px", **card_style()}),
+            html.Div([
+                html.Div("Electorate vs Candidate Gender Breakdown", style={"color": TEXT_PRIMARY, "fontSize": "14px",
+                    "fontWeight": "700", "padding": "14px 16px 4px"}),
+                html.Div("Compares the electorate's gender composition (% of registered voters who are male/female) "
+                         "against the sex of the 2026 candidates in the current selection.",
+                         style={"color": TEXT_MUTED, "fontSize": "11px", "fontStyle": "italic",
+                                "padding": "0 16px 8px"}),
+                dcc.Graph(id="j26-cand-gender", config={"displayModeBar": False}, style={"height": "300px"}),
+            ], style={"flex": "1", "minWidth": "300px", **card_style()}),
+            html.Div([
+                html.Div("Electorate vs Candidate Age Breakdown", style={"color": TEXT_PRIMARY, "fontSize": "14px",
+                    "fontWeight": "700", "padding": "14px 16px 4px"}),
+                html.Div("Compares the electorate's age composition (% of registered voters in each age band) "
+                         "against the age distribution of the 2026 candidates in the current selection.",
+                         style={"color": TEXT_MUTED, "fontSize": "11px", "fontStyle": "italic",
+                                "padding": "0 16px 8px"}),
+                dcc.Graph(id="j26-cand-age", config={"displayModeBar": False}, style={"height": "300px"}),
+            ], style={"flex": "1", "minWidth": "300px", **card_style()}),
         ], style={"display": "flex", "gap": "16px", "padding": "16px 28px", "flexWrap": "wrap"}),
 
         html.Div([
@@ -381,8 +393,8 @@ def update(seats, parties):
     tbl_df = df[["SEAT_NUM", "SEAT_LABEL", "PARLIAMENTARY NAME", "PARTY", "BLOC", "CANDIDATE", "SEX", "AGE"]].copy()
     tbl_df["DUN Code"] = tbl_df["SEAT_NUM"].apply(seat_code_label)
     tbl_df["Party"] = [coalition_label(p, b) for p, b in zip(tbl_df["PARTY"], tbl_df["BLOC"])]
-    tbl_df["SEAT_LABEL"] = tbl_df["SEAT_LABEL"].str.title()
-    tbl_df["PARLIAMENTARY NAME"] = tbl_df["PARLIAMENTARY NAME"].astype(str).str.title()
+    tbl_df["SEAT_LABEL"] = tbl_df["SEAT_LABEL"].str.upper()
+    tbl_df["PARLIAMENTARY NAME"] = tbl_df["PARLIAMENTARY NAME"].astype(str).str.upper()
     tbl_df["AGE"] = tbl_df["AGE"].apply(lambda x: "—" if pd.isna(x) else int(x))
     tbl_df = tbl_df.rename(columns={"SEAT_LABEL": "DUN Name", "PARLIAMENTARY NAME": "Parliament Area",
                                      "CANDIDATE": "Candidate Name", "SEX": "Sex", "AGE": "Age"})
