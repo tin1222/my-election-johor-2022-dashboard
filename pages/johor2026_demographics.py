@@ -228,7 +228,7 @@ def update(urban):
             hovertemplate=f"<b>{bloc}</b><br>%{{x}}: %{{y:.1f}}%<extra></extra>",
         ))
     fig_age.update_layout(**CHART_LAYOUT,
-        title=dict(text="Age Group Distribution by Contesting Bloc", font=dict(size=14, color=TEXT_PRIMARY), x=0.01),
+        title=dict(text="Voters' Age Group Distribution by Contesting Bloc", font=dict(size=14, color=TEXT_PRIMARY), x=0.01),
         barmode="group", showlegend=True,
         xaxis=dict(showgrid=False, color=TEXT_MUTED),
         yaxis=dict(showgrid=True, gridcolor=BORDER, zeroline=False, color=TEXT_MUTED, ticksuffix="%"),

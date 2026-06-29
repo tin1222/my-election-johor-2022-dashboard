@@ -104,8 +104,7 @@ def topbar():
                          style={"height":"24px","marginRight":"10px"}),
             ], href="/", style={"textDecoration":"none","display":"flex","alignItems":"center",
                                 "marginRight":"14px"}),
-            html.Span("Johor", style={"color":TEXT_PRIMARY,"fontSize":"14px","fontWeight":"600",
-                                       "marginRight":"10px"}),
+
             html.Div([
                 dcc.Link("2026", id="topbar-tab-2026", href=SECTIONS["2026"]["home"]),
                 dcc.Link("2022", id="topbar-tab-2022", href=SECTIONS["2022"]["home"]),
