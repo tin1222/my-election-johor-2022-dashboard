@@ -22,7 +22,7 @@ from collections import defaultdict
 from utils.johor2026_data import (
     load_2022_candidates, load_2026_candidates, get_seat_2022, get_seat_2026,
     bloc_votes_for_seat_2022, blocs_contesting_2026, seat_options, party_color, bloc_color,
-    load_geo, coalition_label, blocs_in_2022, blocs_in_2026,
+    load_geo, coalition_label,
 )
 from utils import BG_DARK, BG_CARD, BG_CARD2, BORDER, TEXT_PRIMARY, TEXT_MUTED, ACCENT, map_bounds_zoom
 
@@ -456,40 +456,108 @@ def recompute_seat(pct_values, to_values, pct_ids, to_ids, code):
 
 
 # ── Statewide Rollup ──────────────────────────────────────────────────────────────
+# Matrix rows = 2022 source groups; columns = 2026 destination groups.
 
-FROM_BLOC_OPTS = [{"label": b, "value": b} for b in blocs_in_2022()]
-TO_BLOC_OPTS = [{"label": b, "value": b} for b in blocs_in_2026()]
+SRC_GROUPS = ["BN", "PH", "PN", "MUDA", "OTHERS & INDEPENDENTS"]
+SRC_BLOCS = {
+    "BN":                    ["BN"],
+    "PH":                    ["PH"],
+    "PN":                    ["PN"],
+    "MUDA":                  ["MUDA"],
+    "OTHERS & INDEPENDENTS": ["PEJUANG", "PBM", "INDEPENDENT", "OTHERS"],
+}
+
+DST_COLS = ["BN", "PH", "PN", "MUDA + PSM", "BERSAMA", "OTHERS & INDEPENDENTS"]
+DST_PARTIES = {
+    "BN":                    frozenset(["UMNO", "MCA", "MIC", "GERAKAN"]),
+    "PH":                    frozenset(["PKR", "DAP", "AMANAH"]),
+    "PN":                    frozenset(["PAS", "PPBM", "BERSATU", "MIPP", "PEJUANG"]),
+    "MUDA + PSM":            frozenset(["MUDA", "PSM"]),
+    "BERSAMA":               frozenset(["BERSAMA"]),
+    "OTHERS & INDEPENDENTS": frozenset(["POAM", "PUTRA", "WARISAN", "INDEPENDENT"]),
+}
+DST_TO_BLOC = {
+    "BN": "BN", "PH": "PH", "PN": "PN",
+    "MUDA + PSM": "MUDA", "BERSAMA": "BERSAMA",
+    "OTHERS & INDEPENDENTS": "INDEPENDENT",
+}
 
 
-def simulate_statewide(turnout_delta, swing_rules):
-    """swing_rules: list of (from_bloc, to_bloc, pct). Returns per-seat projection rows."""
-    seats = load_2022_candidates()[["UNIQUE CODE", "SEAT_LABEL", "PARLIAMENTARY NAME"]].drop_duplicates()
+def default_rollup_matrix():
+    m = {src: {dst: 0.0 for dst in DST_COLS} for src in SRC_GROUPS}
+    m["BN"]["BN"] = 100.0
+    m["PH"]["PH"] = 100.0
+    m["PN"]["PN"] = 100.0
+    m["MUDA"]["MUDA + PSM"] = 100.0
+    m["OTHERS & INDEPENDENTS"]["OTHERS & INDEPENDENTS"] = 100.0
+    return m
+
+
+def get_statewide_src_totals():
+    """Total 2022 votes per source group, cached."""
+    c22 = load_2022_candidates()
+    tot = sum(c22["VOTES"])
+    out = {}
+    for grp, blocs in SRC_BLOCS.items():
+        v = int(c22[c22["BLOC"].isin(blocs)]["VOTES"].sum())
+        out[grp] = (v, f"{v / tot * 100:.1f}%" if tot else "0%")
+    return out
+
+
+def simulate_statewide_matrix(pct_matrix, turnout_map):
+    """Full swing matrix: each (src_group, dst_col) cell is a % of src votes going to dst."""
+    c22 = load_2022_candidates()
+    c26 = load_2026_candidates()
+    seats = c22[["UNIQUE CODE", "SEAT_LABEL", "PARLIAMENTARY NAME"]].drop_duplicates()
+
     rows = []
     for _, seat in seats.iterrows():
         code = seat["UNIQUE CODE"]
-        bloc_votes = bloc_votes_for_seat_2022(code)
-        adjusted = {b: v * (1 + turnout_delta / 100) for b, v in bloc_votes.items()}
+        bloc_v = bloc_votes_for_seat_2022(code)
+        seat_parties_26 = set(c26[c26["UNIQUE CODE"] == code]["PARTY"].unique())
 
-        for from_b, to_b, pct in swing_rules:
-            if not pct or from_b == to_b or from_b not in adjusted:
+        # Eligible dst columns for this seat (has at least one matching 2026 party)
+        eligible_dst = {dst: DST_PARTIES[dst] & seat_parties_26
+                        for dst in DST_COLS if DST_PARTIES[dst] & seat_parties_26}
+
+        # Turnout-adjusted source votes per src group
+        src_adj = {}
+        for grp, blocs in SRC_BLOCS.items():
+            base = sum(bloc_v.get(b, 0) for b in blocs)
+            delta = float(turnout_map.get(grp, 0) or 0)
+            src_adj[grp] = max(0.0, base * (1 + delta / 100))
+
+        # Redistribute via matrix (rows normalised to 100% on compute)
+        proj_by_dst = {dst: 0.0 for dst in DST_COLS}
+        wasted = 0.0
+        for grp, adj in src_adj.items():
+            row = pct_matrix.get(grp, {})
+            row_total = sum((v or 0) for v in row.values())
+            if row_total <= 0:
                 continue
-            shift = adjusted[from_b] * (pct / 100)
-            adjusted[from_b] -= shift
-            adjusted[to_b] = adjusted.get(to_b, 0) + shift
+            for dst in DST_COLS:
+                pct = (row.get(dst) or 0) / row_total * 100
+                moved = adj * pct / 100
+                if dst in eligible_dst:
+                    proj_by_dst[dst] += moved
+                else:
+                    wasted += moved
 
-        eligible = blocs_contesting_2026(code)
-        usable = {b: v for b, v in adjusted.items() if b in eligible and v > 0}
-        wasted = sum(v for b, v in adjusted.items() if b not in eligible)
+        # Project to bloc-level winner
+        proj_by_bloc = {}
+        for dst, v in proj_by_dst.items():
+            if v > 0:
+                b = DST_TO_BLOC.get(dst, dst)
+                proj_by_bloc[b] = proj_by_bloc.get(b, 0) + v
 
-        base_winner = max(bloc_votes, key=bloc_votes.get) if bloc_votes else None
-        proj_winner = max(usable, key=usable.get) if usable else base_winner
+        base_winner = max(bloc_v, key=bloc_v.get) if bloc_v else None
+        proj_winner = max(proj_by_bloc, key=proj_by_bloc.get) if proj_by_bloc else base_winner
 
         rows.append(dict(
             code=code, seat=seat["SEAT_LABEL"], parliament=seat["PARLIAMENTARY NAME"],
             base_winner=base_winner, proj_winner=proj_winner,
             flipped=proj_winner != base_winner,
-            proj_total=sum(usable.values()), wasted=wasted,
-            base_votes=bloc_votes, proj_votes=usable,
+            proj_total=sum(proj_by_dst.values()), wasted=wasted,
         ))
     return rows
 
@@ -532,72 +600,79 @@ def make_rollup_map(rows):
     return fig
 
 
-DEFAULT_NUM_RULES = 3
-MAX_NUM_RULES = 10
+def build_rollup_matrix_row(src, totals_row):
+    """Build one HTML table row for a 2022 source group."""
+    total_v, total_pct = totals_row
+    defaults = default_rollup_matrix()[src]
+    row_val_sum = sum(defaults.values())
 
+    cells = [html.Td([
+        html.Div([
+            html.Span("● ", style={"color": bloc_color(SRC_BLOCS[src][0])}),
+            html.Span(src, style={"fontWeight": "700", "fontSize": "12px"}),
+        ]),
+        html.Div(f"{total_v:,} votes ({total_pct} statewide)",
+                 style={"color": TEXT_MUTED, "fontSize": "10px", "marginBottom": "6px"}),
+        html.Div("Turnout Difference", style={"color": TEXT_MUTED, "fontSize": "10px", "marginBottom": "2px"}),
+        html.Div(
+            dcc.Slider(id={"type": "j26-roll-to-slider", "src": src}, min=-100, max=100, step=0.5, value=0,
+                       marks=None, included=False, tooltip={"placement": "bottom", "always_visible": False}),
+            style={"width": "140px", "marginBottom": "2px"}),
+        html.Div([
+            _num_input({"type": "j26-roll-to", "src": src}, 0, width="56px"),
+            html.Span("%", style={"color": TEXT_MUTED, "fontSize": "10px"}),
+        ], style={"display": "flex", "alignItems": "center", "gap": "4px"}),
+    ], style={"padding": "8px 10px", "borderTop": f"1px solid {BORDER}"})]
 
-def build_rule_row(i):
-    return html.Div([
-        dcc.Dropdown(id={"type": "j26-roll-from", "idx": i}, options=FROM_BLOC_OPTS, value=None,
-                     placeholder="From bloc (2022)", clearable=True, className="dash-dropdown-dark",
-                     style={"minWidth": "140px"}),
-        html.Span("→", style={"color": TEXT_MUTED, "alignSelf": "center", "padding": "0 4px"}),
-        dcc.Dropdown(id={"type": "j26-roll-to", "idx": i}, options=TO_BLOC_OPTS, value=None,
-                     placeholder="To bloc (2026)", clearable=True, className="dash-dropdown-dark",
-                     style={"minWidth": "140px"}),
-        dcc.Input(id={"type": "j26-roll-pct", "idx": i}, type="number", value=0, min=0, max=100, step=1,
-                  style={"background": BG_CARD2, "border": f"1px solid {BORDER}", "color": TEXT_PRIMARY,
-                         "borderRadius": "6px", "padding": "6px 8px", "width": "64px", "marginLeft": "6px",
-                         "fontFamily": "Inter", "fontSize": "13px"}),
-        html.Span("%", style={"color": TEXT_MUTED, "marginLeft": "4px", "alignSelf": "center"}),
-    ], style={"display": "flex", "gap": "4px", "alignItems": "center", "marginBottom": "8px"})
+    for dst in DST_COLS:
+        cells.append(html.Td(
+            _num_input({"type": "j26-roll-pct", "src": src, "dst": dst}, defaults[dst]),
+            style={"padding": "8px 6px", "textAlign": "center", "borderTop": f"1px solid {BORDER}"}))
+
+    cells.append(html.Td(
+        html.Div(id={"type": "j26-roll-rowtotal", "src": src}, children=f"{row_val_sum:.1f}%",
+                 style={"fontWeight": "700", "fontSize": "12px", "color": "#4CAF50"}),
+        style={"padding": "8px 10px", "textAlign": "center", "borderTop": f"1px solid {BORDER}"}))
+    return html.Tr(cells)
 
 
 def build_rollup_panel():
-    return html.Div([
-        html.Div([
-            html.Div([
-                html.Div([
-                    html.Label("Overall Turnout Change (all blocs, all seats)", style=_label_style()),
-                    html.Button("↺ Reset", id="j26-roll-reset", n_clicks=0, style={
-                        "background": "transparent", "color": TEXT_MUTED, "border": f"1px solid {BORDER}",
-                        "borderRadius": "8px", "padding": "5px 12px", "cursor": "pointer", "fontSize": "11px",
-                        "fontFamily": "Inter", "whiteSpace": "nowrap"}),
-                ], style={"display": "flex", "justifyContent": "space-between", "alignItems": "center"}),
-                dcc.Slider(id="j26-roll-turnout", min=-50, max=50, step=0.5, value=0,
-                           marks={-50: "-50%", 0: "0%", 50: "+50%"},
-                           tooltip={"placement": "bottom", "always_visible": True}),
-                html.Div("Scales every contesting party's 2022 vote count by this percentage, uniformly across "
-                         "all 56 seats, before any swing rules below are applied — e.g. +10% means every "
-                         "party's vote total grows by 10% relative to its own 2022 result. This is a relative "
-                         "change to vote counts, not an absolute shift in the turnout rate.",
-                         style={"color": TEXT_MUTED, "fontSize": "10px", "marginTop": "4px"}),
-            ], style={"flex": "1", "minWidth": "260px"}),
-            html.Div([
-                html.Div([
-                    html.Label("Bloc-Level Swing Rules (applied to every seat where eligible)",
-                               style=_label_style()),
-                    html.Div([
-                        html.Span("Number of rules", style={"color": TEXT_MUTED, "fontSize": "11px",
-                                                              "marginRight": "6px"}),
-                        dcc.Input(id="j26-roll-num-rules", type="number", value=DEFAULT_NUM_RULES,
-                                  min=1, max=MAX_NUM_RULES, step=1,
-                                  style={"background": BG_CARD2, "border": f"1px solid {BORDER}",
-                                         "color": TEXT_PRIMARY, "borderRadius": "6px", "padding": "4px 6px",
-                                         "width": "50px", "fontFamily": "Inter", "fontSize": "12px"}),
-                    ], style={"display": "flex", "alignItems": "center"}),
-                ], style={"display": "flex", "justifyContent": "space-between", "alignItems": "center",
-                          "marginBottom": "8px"}),
-                html.Div(id="j26-roll-rules-container"),
-                html.Div("If the destination bloc doesn't field a 2026 candidate in a given seat, "
-                         "those swung votes are excluded from that seat's projection (shown as wasted votes).",
-                         style={"color": TEXT_MUTED, "fontSize": "10px", "marginTop": "2px"}),
-            ], style={"flex": "2", "minWidth": "360px"}),
-        ], style={"display": "flex", "gap": "24px", "flexWrap": "wrap", **card_style(), "padding": "16px 18px",
-                  "marginBottom": "16px"}),
+    totals = get_statewide_src_totals()
 
+    hdr_style = {"textAlign": "center", "padding": "8px 6px", "color": TEXT_MUTED, "fontSize": "11px",
+                 "minWidth": "84px"}
+    header_cells = [html.Th("2022 Source (turnout Δ%)", style={"textAlign": "left", "padding": "8px 10px",
+                     "color": TEXT_MUTED, "fontSize": "11px"})]
+    for dst in DST_COLS:
+        header_cells.append(html.Th(html.Span(dst, style={"fontWeight": "700"}), style=hdr_style))
+    header_cells.append(html.Th("Row Total", style={"textAlign": "center", "padding": "8px 10px",
+                        "color": TEXT_MUTED, "fontSize": "11px"}))
+
+    matrix_table = html.Table([
+        html.Thead(html.Tr(header_cells)),
+        html.Tbody([build_rollup_matrix_row(src, totals[src]) for src in SRC_GROUPS]),
+    ], style={"width": "100%", "borderCollapse": "collapse"})
+
+    return html.Div([
         html.Div(id="j26-roll-kpis", style={"display": "flex", "gap": "12px", "flexWrap": "wrap",
                                               "marginBottom": "16px"}),
+
+        html.Div([
+            html.Div([
+                html.Div("2022 → 2026 Swing & Turnout Matrix", style={"color": TEXT_PRIMARY, "fontSize": "14px",
+                          "fontWeight": "700"}),
+                html.Button("↺ Reset", id={"type": "j26-roll-reset", "panel": "rollup"}, n_clicks=0, style={
+                    "background": "transparent", "color": TEXT_MUTED, "border": f"1px solid {BORDER}",
+                    "borderRadius": "8px", "padding": "5px 12px", "cursor": "pointer", "fontSize": "11px",
+                    "fontFamily": "Inter", "whiteSpace": "nowrap"}),
+            ], style={"display": "flex", "justifyContent": "space-between", "alignItems": "center",
+                      "marginBottom": "8px"}),
+            html.Div(matrix_table, style={"overflowX": "auto"}),
+            html.Div("Each row should sum to 100%. The Row Total turns red if it doesn't. "
+                     "If a 2026 party doesn't contest a given seat, votes to that column are excluded "
+                     "from that seat's projection (counted as wasted votes in the KPIs above).",
+                     style={"color": TEXT_MUTED, "fontSize": "10px", "marginTop": "8px", "fontStyle": "italic"}),
+        ], style={**card_style(), "padding": "14px 16px", "marginBottom": "16px"}),
 
         html.Div([
             html.Div([
@@ -623,24 +698,28 @@ def build_rollup_panel():
 
 
 @callback(
-    Output("j26-roll-rules-container", "children"),
-    Input("j26-roll-num-rules", "value"),
-    Input("j26-roll-reset", "n_clicks"),
+    Output({"type": "j26-roll-to", "src": MATCH}, "value"),
+    Output({"type": "j26-roll-to-slider", "src": MATCH}, "value"),
+    Input({"type": "j26-roll-to", "src": MATCH}, "value"),
+    Input({"type": "j26-roll-to-slider", "src": MATCH}, "value"),
+    prevent_initial_call=True,
 )
-def render_rule_rows(n, _):
-    n = int(n) if n else 1
-    n = max(1, min(MAX_NUM_RULES, n))
-    return [build_rule_row(i) for i in range(n)]
+def sync_rollup_turnout(input_val, slider_val):
+    trig = ctx.triggered_id
+    if trig and trig.get("type") == "j26-roll-to-slider":
+        return slider_val, no_update
+    return no_update, input_val
 
 
 @callback(
-    Output("j26-roll-turnout", "value"),
-    Output("j26-roll-num-rules", "value"),
-    Input("j26-roll-reset", "n_clicks"),
-    prevent_initial_call=True,
+    Output({"type": "j26-roll-rowtotal", "src": MATCH}, "children"),
+    Output({"type": "j26-roll-rowtotal", "src": MATCH}, "style"),
+    Input({"type": "j26-roll-pct", "src": MATCH, "dst": ALL}, "value"),
 )
-def reset_rollup(_):
-    return 0, DEFAULT_NUM_RULES
+def validate_rollup_row(values):
+    total = sum((v or 0) for v in values)
+    color = "#4CAF50" if abs(total - 100) < 0.05 else "#E53935"
+    return f"{total:.1f}%", {"fontWeight": "700", "fontSize": "12px", "color": color}
 
 
 @callback(
@@ -648,15 +727,21 @@ def reset_rollup(_):
     Output("j26-roll-map", "figure"),
     Output("j26-roll-seat-bar", "figure"),
     Output("j26-roll-flip-table", "children"),
-    Input("j26-roll-turnout", "value"),
-    Input({"type": "j26-roll-from", "idx": ALL}, "value"),
-    Input({"type": "j26-roll-to", "idx": ALL}, "value"),
-    Input({"type": "j26-roll-pct", "idx": ALL}, "value"),
+    Input({"type": "j26-roll-pct", "src": ALL, "dst": ALL}, "value"),
+    Input({"type": "j26-roll-to", "src": ALL}, "value"),
+    State({"type": "j26-roll-pct", "src": ALL, "dst": ALL}, "id"),
+    State({"type": "j26-roll-to", "src": ALL}, "id"),
 )
-def recompute_rollup(turnout_delta, froms, tos, pcts):
-    turnout_delta = float(turnout_delta or 0)
-    swing_rules = list(zip(froms, tos, [float(p or 0) for p in pcts]))
-    rows = simulate_statewide(turnout_delta, swing_rules)
+def recompute_rollup_matrix(pct_values, to_values, pct_ids, to_ids):
+    if not pct_ids:
+        return no_update, no_update, no_update, no_update
+
+    pct_matrix = defaultdict(dict)
+    for id_, val in zip(pct_ids, pct_values):
+        pct_matrix[id_["src"]][id_["dst"]] = val if val is not None else 0
+    turnout_map = {id_["src"]: (val or 0) for id_, val in zip(to_ids, to_values)}
+
+    rows = simulate_statewide_matrix(pct_matrix, turnout_map)
 
     n_flipped = sum(1 for r in rows if r["flipped"])
     base_seats = pd.Series([r["base_winner"] for r in rows]).value_counts().to_dict()
@@ -700,7 +785,7 @@ def recompute_rollup(turnout_delta, froms, tos, pcts):
     flipped_rows = [r for r in rows if r["flipped"]]
     if flipped_rows:
         tbl = pd.DataFrame([{
-            "Constituency": r["seat"].title(), "Parliament Area": str(r["parliament"]).title(),
+            "Constituency": r["seat"].upper(), "Parliament Area": str(r["parliament"]).upper(),
             "2022 Winner": r["base_winner"], "2026 Projected": r["proj_winner"],
         } for r in flipped_rows]).sort_values("Constituency")
         table = dash_table.DataTable(
@@ -754,11 +839,14 @@ def layout():
     ], style={"background": BG_DARK, "minHeight": "100vh", "color": TEXT_PRIMARY, "fontFamily": "Inter, sans-serif"})
 
 
-@callback(Output("j26-sim-tab-content", "children"), Input("j26-sim-tabs", "value"))
-def render_tab(tab):
+@callback(
+    Output("j26-sim-tab-content", "children"),
+    Input("j26-sim-tabs", "value"),
+    Input({"type": "j26-roll-reset", "panel": ALL}, "n_clicks"),
+)
+def render_tab(tab, _reset_clicks):
     if tab == "state":
         return build_rollup_panel()
-
     opts = seat_options()
     return html.Div([
         html.Div([
@@ -774,3 +862,5 @@ def render_tab(tab):
         ], style={"display": "flex", "gap": "16px", "alignItems": "flex-end", "marginBottom": "16px"}),
         html.Div(id="j26-sim-seat-panel"),
     ])
+
+
